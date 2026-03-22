@@ -21,5 +21,6 @@ cell_id_t hl_get_result(cell_id_t id);
 // utils
 void hl_print_cell(cell_id_t id);
 size_t hl_memory_usage();
+int hl_get_order(cell_id_t id);
 
 #endif

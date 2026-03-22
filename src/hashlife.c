@@ -44,7 +44,7 @@ static cell_id_t _hl_get_or_create_cell_from_structure(const cell_struct_t struc
     hmput(g_cells_map , structure, i);
     arrpush(g_cells_arena , cell);
 
-    //printf("NEW CELL %d\n", i);
+    printf("NEW CELL %d\n", i);
     //print_cell(i);
     //printf("END CELL\n");
   }
@@ -360,4 +360,8 @@ void hl_print_cell(cell_id_t cell_id){
 size_t hl_memory_usage(){
   return hmlenu(g_cells_map ) * sizeof(hash_node_t) +
    arrlenu(g_cells_arena ) * sizeof(cell_t);
+}
+
+int hl_get_order(cell_id_t id){
+  return g_cells_arena[id].structure.n;
 }
