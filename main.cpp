@@ -1,11 +1,11 @@
 
-#include <stdio.h>
-#include <string.h>
-#include "hashlife.h"
 #include <GL/glut.h>
 #include <ctype.h>
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
 
+#include "hashlife.h"
 
 int g_size;
 uint8_t* g_grid;
@@ -14,7 +14,6 @@ hashlife::cell_id_t g_id;
 double g_total_iters = 0;
 double g_last_time = 0;
 double g_ips = 0;
-
 
 double now() {
   struct timespec ts;
@@ -41,33 +40,29 @@ uint8_t* load_rle(const char* filename, int* out_w, int* out_h) {
   *out_w = w;
   *out_h = h;
 
-  uint8_t* grid = new uint8_t[w*h];
+  uint8_t* grid = new uint8_t[w * h];
 
   int x = 0, y = 0;
   int count = 0;
 
   while (fgets(line, sizeof(line), f)) {
     for (char* c = line; *c; c++) {
-
       if (isdigit(*c)) {
         count = count * 10 + (*c - '0');
-      }
-      else if (*c == 'b' || *c == 'o') {
+      } else if (*c == 'b' || *c == 'o') {
         if (count == 0) count = 1;
 
         for (int i = 0; i < count; i++) {
-          if (*c == 'o') grid[y*w + x] = 1;
+          if (*c == 'o') grid[y * w + x] = 1;
           x++;
         }
         count = 0;
-      }
-      else if (*c == '$') {
+      } else if (*c == '$') {
         if (count == 0) count = 1;
         y += count;
         x = 0;
         count = 0;
-      }
-      else if (*c == '!') {
+      } else if (*c == '!') {
         fclose(f);
         return grid;
       }
@@ -81,10 +76,10 @@ uint8_t* load_rle(const char* filename, int* out_w, int* out_h) {
 #include <unistd.h>
 
 void print_grid(uint8_t* grid, int size) {
-  printf("\033[H"); // curseur en haut
+  printf("\033[H");  // curseur en haut
   for (int i = 0; i < size; i++) {
     for (int j = 0; j < size; j++) {
-      printf(grid[i*size + j] ? "██" : "  ");
+      printf(grid[i * size + j] ? "██" : "  ");
     }
     printf("\n");
   }
@@ -99,11 +94,10 @@ void display() {
 
   for (int y = 0; y < g_size; y++) {
     for (int x = 0; x < g_size; x++) {
-
-      if (g_grid[y*g_size + x])
-        glColor3f(1.0f, 0.0f, 0.0f); // rouge
+      if (g_grid[y * g_size + x])
+        glColor3f(1.0f, 0.0f, 0.0f);  // rouge
       else
-        glColor3f(0.0f, 0.0f, 0.0f); // noir
+        glColor3f(0.0f, 0.0f, 0.0f);  // noir
 
       float px = x * pixel;
       float py = y * pixel;
@@ -122,8 +116,6 @@ void display() {
 void update(int v) {
   double t0 = now();
 
-  
-
   g_id = hashlife::double_empty(g_id);
 
   double iters = 1 << (hashlife::get_order(g_id) - 2);
@@ -136,19 +128,18 @@ void update(int v) {
   g_total_iters += iters;
 
   g_ips = g_total_iters / dt;
-    g_total_iters = 0;
-    g_last_time = t1;
+  g_total_iters = 0;
+  g_last_time = t1;
 
-  memset(g_grid, 0, g_size*g_size);
+  memset(g_grid, 0, g_size * g_size);
   hashlife::cell_to_grid(g_id, g_grid);
 
   // mémoire
   double mem_kb = hashlife::memory_usage() / 1024.0;
 
   char title[256];
-  snprintf(title, sizeof(title),
-    "HashLife 🔥 | %.2f IPS | %.1f Ko",
-    g_ips, mem_kb);
+  snprintf(title, sizeof(title), "HashLife 🔥 | %.2f IPS | %.1f Ko", g_ips,
+           mem_kb);
 
   glutSetWindowTitle(title);
 
@@ -166,14 +157,13 @@ void init_gl(int size) {
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  gluOrtho2D(0, win, win, 0); // origine en haut gauche
+  gluOrtho2D(0, win, win, 0);  // origine en haut gauche
 
-  glClearColor(0,0,0,1);
+  glClearColor(0, 0, 0, 1);
 
   glutDisplayFunc(display);
   glutTimerFunc(50, update, 0);
 }
-
 
 void print_bytes(void* ptr, size_t size) {
   unsigned char* p = (unsigned char*)ptr;
@@ -192,16 +182,16 @@ int main(int argc, char** argv) {
   while (size < w || size < h) size <<= 1;
 
   g_size = size;
-  g_grid = new uint8_t[size*size];
+  g_grid = new uint8_t[size * size];
 
-  int offx = (size - w)/2;
-  int offy = (size - h)/2;
+  int offx = (size - w) / 2;
+  int offy = (size - h) / 2;
 
   for (int y = 0; y < h; y++)
     for (int x = 0; x < w; x++)
-      g_grid[(y+offy)*size + (x+offx)] = rle[y*w + x];
+      g_grid[(y + offy) * size + (x + offx)] = rle[y * w + x];
 
-  delete[](rle);
+  delete[] (rle);
 
   g_id = hashlife::cell_from_grid(g_grid, size);
 

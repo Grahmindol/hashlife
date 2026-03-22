@@ -18,7 +18,7 @@
 CC = g++
 
 # Flags for compilation and linking
-CFLAGS = -c -I$(HEADER_DIR) -fopenmp -O3 -g -march=native -Wno-unused-result
+CFLAGS = -c -I$(HEADER_DIR) -fopenmp -O0 -g -march=native -Wno-unused-result
 LDFLAGS = -lm -lGL -lGLU -lglut -lpthread -fopenmp 
 
 # Directories
