@@ -3,19 +3,19 @@
 # project/
 # ├── bin/               # Directory for the compiled binary and object files
 # │   ├── obj/           # Subdirectory for object files
-# │   │   ├── main.o     # Object file for main.c
+# │   │   ├── main.o     # Object file for main.cpp
 # │   │   └── other.o    # Object files for each source file in src/
 # │   └── main           # The executable
 # ├── headers/           # Directory for header files (.h)
 # │   └── some.h
-# ├── src/               # Directory for source files (.c)
-# │   └── some.c
-# ├── main.c
+# ├── src/               # Directory for source files (.cpp)
+# │   └── some.cpp
+# ├── main.cpp
 # └── Makefile           # The Makefile itself
 #
 
 # Compiler
-CC = gcc
+CC = g++
 
 # Flags for compilation and linking
 CFLAGS = -c -I$(HEADER_DIR) -fopenmp -O3 -g -march=native -Wno-unused-result
@@ -27,11 +27,11 @@ HEADER_DIR = headers
 BIN_DIR = bin
 OBJ_DIR = $(BIN_DIR)/obj
 
-# Detect all source files recursively (finds both main.c and src/*.c)
-SRC = $(wildcard *.c) $(wildcard $(SRC_DIR)/*.c)
+# Detect all source files recursively (finds both main.cpp and src/*.cpp)
+SRC = $(wildcard *.cpp) $(wildcard $(SRC_DIR)/*.cpp)
 
 # Define the object files (place .o files in OBJ_DIR)
-OBJ = $(patsubst %.c, $(OBJ_DIR)/%.o, $(notdir $(SRC)))
+OBJ = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(notdir $(SRC)))
 
 # Name of the executable
 TARGET = $(BIN_DIR)/main
@@ -44,11 +44,11 @@ $(TARGET): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 # Rule to compile each source file into OBJ_DIR
-$(OBJ_DIR)/%.o: %.c $(HEADERS)
+$(OBJ_DIR)/%.o: %.cpp $(HEADERS)
 	$(CC) $(CFLAGS) $< -o $@
 
 # Rule to compile each source file from src/ into OBJ_DIR
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(HEADERS)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
 	$(CC) $(CFLAGS) $< -o $@
 
 # Clean target to remove compiled objects and the binary

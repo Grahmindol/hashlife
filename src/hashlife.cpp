@@ -1,71 +1,88 @@
 #include "hashlife.h"
 
+#include <unordered_map>
+#include <vector>
+#include <cstring>
+#include <iostream>
 
-#include <stdio.h>
-#include <string.h>
+using cell_id_t = uint32_t;
 
-#define STB_DS_IMPLEMENTATION
-#include "stb_ds.h"
+struct cell_struct_t {
+    int n;
+
+    union {
+        uint8_t values[4][4];
+        cell_id_t child_ids[4];
+    };
+
+    uint8_t operator==(const cell_struct_t& other) const {
+        if (n != other.n) return false;
+
+        if (n == 2)
+            return std::memcmp(values, other.values, sizeof(values)) == 0;
+        else
+            return std::memcmp(child_ids, other.child_ids, sizeof(child_ids)) == 0;
+    }
+};
+
+struct CellHash {
+    size_t operator()(const cell_struct_t& c) const {
+        uint64_t h = c.n * 0x9E3779B97F4A7C15ULL;
+
+        if (c.n == 2) {
+            const uint64_t* p = (const uint64_t*)c.values;
+            h ^= p[0] + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            h ^= p[1] + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+        } else {
+            for (int i = 0; i < 4; i++) {
+                h ^= c.child_ids[i] + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            }
+        }
+
+        return h;
+    }
+};
+
+struct cell_t {
+    cell_struct_t structure;
+    cell_id_t result = -1u;
+};
+
+static std::vector<cell_t> g_cells_arena;
+static std::unordered_map<cell_struct_t, cell_id_t, CellHash> g_cells_map;
 
 
-typedef unsigned int cell_id_t;
-typedef struct cell_struct_t {
-  int n;
-  union {
-    bool values[4][4];
-    cell_id_t child_ids[4];
-  };
-} cell_struct_t;
+static cell_id_t _hl_get_or_create_cell_from_structure(const cell_struct_t& structure) {
+    auto it = g_cells_map.find(structure);
 
-typedef struct hash_node_t {
-  struct cell_struct_t key;
-  cell_id_t value;
-} hash_node_t;
+    if (it == g_cells_map.end()) {
+        cell_id_t id = g_cells_arena.size();
 
-typedef struct cell_t {
-  struct cell_struct_t structure;
-  cell_id_t result;
-} cell_t;
+        g_cells_arena.push_back({structure, (cell_id_t)-1});
+        g_cells_map.emplace(structure, id);
 
+        std::cout << "NEW CELL " << id << "\n";
+        return id;
+    }
 
-static cell_t* g_cells_arena  = NULL;
-static hash_node_t* g_cells_map  = NULL;
-
-
-static cell_id_t _hl_get_or_create_cell_from_structure(const cell_struct_t structure) {
-  //print_bytes(&structure, sizeof(cell_struct_t));
-  long i = hmgeti(g_cells_map , structure);
-  if (i < 0) {
-    
-
-    cell_t cell = (cell_t){.structure = structure, .result = -1};
-    i = arrlen(g_cells_arena );
-
-    hmput(g_cells_map , structure, i);
-    arrpush(g_cells_arena , cell);
-
-    printf("NEW CELL %d\n", i);
-    //print_cell(i);
-    //printf("END CELL\n");
-  }
-  return (cell_id_t)i;
+    return it->second;
 }
 
-static cell_id_t _hl_get_or_create_cell_from_vals(bool vals[4][4]) {
-  cell_struct_t structure = {0};
-  structure.n = 2;
-  memcpy(structure.values, vals, sizeof(structure.values));
-  return _hl_get_or_create_cell_from_structure(structure);
+static cell_id_t _hl_get_or_create_cell_from_vals(uint8_t vals[4][4]) {
+    cell_struct_t s{};
+    s.n = 2;
+    std::memcpy(s.values, vals, sizeof(s.values));
+    return _hl_get_or_create_cell_from_structure(s);
 }
 
 static cell_id_t _hl_get_or_create_cell_from_childs(cell_id_t childs[4]) {
-  cell_struct_t structure = {0};
-  structure.n = g_cells_arena [childs[0]].structure.n + 1;
-  memcpy(structure.child_ids, childs, sizeof(structure.child_ids));
-  return _hl_get_or_create_cell_from_structure(structure);
+    cell_struct_t s{};
+    s.n = g_cells_arena[childs[0]].structure.n + 1;
+    std::memcpy(s.child_ids, childs, sizeof(s.child_ids));
+    return _hl_get_or_create_cell_from_structure(s);
 }
 
-static cell_id_t _hl_cell_from_grid_aux(bool* grid, size_t grid_size,
+static cell_id_t _hl_cell_from_grid_aux(const uint8_t* grid, size_t grid_size,
                             unsigned int i, unsigned int j, unsigned int size) {
   if ((size & (size - 1)) != 0) {
     printf("ERROR: size doit etre une puissnace de 2 !!! \n");
@@ -73,7 +90,7 @@ static cell_id_t _hl_cell_from_grid_aux(bool* grid, size_t grid_size,
   }
 
   if (size == 4) {
-    bool vals[4][4];
+    uint8_t vals[4][4];
     for (int x = 0; x < 4; x++)
       for (int y = 0; y < 4; y++)
         vals[x][y] = grid[(i + x) * grid_size + (j + y)];
@@ -89,7 +106,7 @@ static cell_id_t _hl_cell_from_grid_aux(bool* grid, size_t grid_size,
   return _hl_get_or_create_cell_from_childs(childs);
 }
 
-static void _hl_cell_to_grid_aux(cell_id_t cell_id, bool* grid, size_t grid_size,
+static void _hl_cell_to_grid_aux(cell_id_t cell_id, uint8_t* grid, size_t grid_size,
                   unsigned int i, unsigned int j) {
   cell_t cell = g_cells_arena [cell_id];
   if (cell.structure.n == 2) {
@@ -111,7 +128,7 @@ static void _hl_cell_to_grid_aux(cell_id_t cell_id, bool* grid, size_t grid_size
 cell_id_t get_empty_cell(int n) {
   // cas de base
   if (n == 2) {
-    bool vals[4][4] = {0};
+    uint8_t vals[4][4] = {0};
     return _hl_get_or_create_cell_from_vals(vals);
   }
 
@@ -133,27 +150,27 @@ cell_id_t get_empty_cell(int n) {
 
 
 
-void hl_reset() {
-  hmfree(g_cells_map);
-  arrfree(g_cells_arena);
+void hashlife::reset() {
+    g_cells_map.clear();
+    g_cells_arena.clear();
 }
 
-cell_id_t hl_cell_from_grid(bool* grid, size_t grid_size){
+hashlife::cell_id_t hashlife::cell_from_grid(const uint8_t* grid, size_t grid_size){
   return _hl_cell_from_grid_aux(grid, grid_size, 0,0, grid_size);
 }
 
-void hl_cell_to_grid(cell_id_t cell_id, bool* grid){
+void hashlife::cell_to_grid(cell_id_t cell_id, uint8_t* grid){
   cell_t cell = g_cells_arena [cell_id];
   size_t grid_size = 0b1 << cell.structure.n;
   return _hl_cell_to_grid_aux(cell_id, grid, grid_size, 0,0);
 }
 
-cell_id_t hl_double_wrap(cell_id_t cell_id) {
+cell_id_t hashlife::double_wrap(cell_id_t cell_id) {
   cell_t cell = g_cells_arena [cell_id];
   cell_id_t shifted;
   if (cell.structure.n == 2) {
-    bool (*v)[4] = cell.structure.values;
-    bool values_shift[4][4] = {
+    uint8_t (*v)[4] = cell.structure.values;
+    uint8_t values_shift[4][4] = {
         {v[2][2], v[2][3], v[2][0], v[2][1]},  // D C
         {v[3][2], v[3][3], v[3][0], v[3][1]},
         {v[0][2], v[0][3], v[0][0], v[0][1]},  // B A
@@ -173,16 +190,16 @@ cell_id_t hl_double_wrap(cell_id_t cell_id) {
   return _hl_get_or_create_cell_from_childs(childs);
 }
 
-cell_id_t hl_double_empty(cell_id_t cell_id){
+cell_id_t hashlife::double_empty(cell_id_t cell_id){
   cell_t cell = g_cells_arena [cell_id];
 
   cell_id_t childs[4];
 
   if (cell.structure.n == 2) {
-    bool (*v)[4] = cell.structure.values;
+    uint8_t (*v)[4] = cell.structure.values;
 
     // NW (vide sauf coin bas droite)
-    bool NW[4][4] = {
+    uint8_t NW[4][4] = {
         {0,0,0,0},
         {0,0,0,0},
         {0,0,v[0][0], v[0][1]},
@@ -190,7 +207,7 @@ cell_id_t hl_double_empty(cell_id_t cell_id){
     };
 
     // NE
-    bool NE[4][4] = {
+    uint8_t NE[4][4] = {
         {0,0,0,0},
         {0,0,0,0},
         {v[0][2], v[0][3],0,0},
@@ -198,7 +215,7 @@ cell_id_t hl_double_empty(cell_id_t cell_id){
     };
 
     // SW
-    bool SW[4][4] = {
+    uint8_t SW[4][4] = {
         {0,0,v[2][0], v[2][1]},
         {0,0,v[3][0], v[3][1]},
         {0,0,0,0},
@@ -206,7 +223,7 @@ cell_id_t hl_double_empty(cell_id_t cell_id){
     };
 
     // SE
-    bool SE[4][4] = {
+    uint8_t SE[4][4] = {
         {v[2][2], v[2][3],0,0},
         {v[3][2], v[3][3],0,0},
         {0,0,0,0},
@@ -224,25 +241,34 @@ cell_id_t hl_double_empty(cell_id_t cell_id){
     // cellules vides du bon niveau
     cell_id_t empty = get_empty_cell(cell.structure.n - 1);
 
-    childs[0] = _hl_get_or_create_cell_from_childs((cell_id_t[]){
+    // NW (vide sauf coin bas droite)
+    cell_id_t NW[4] = {
         empty, empty,
         empty, c[0]
-    });
+    };
 
-    childs[1] = _hl_get_or_create_cell_from_childs((cell_id_t[]){
+    // NE
+    cell_id_t NE[4] = {
         empty, empty,
         c[1], empty
-    });
+    };
 
-    childs[2] = _hl_get_or_create_cell_from_childs((cell_id_t[]){
+    // SW
+    cell_id_t SW[4] = {
         empty, c[2],
         empty, empty
-    });
+    };
 
-    childs[3] = _hl_get_or_create_cell_from_childs((cell_id_t[]){
+    // SE
+    cell_id_t SE[4] = {
         c[3], empty,
         empty, empty
-    });
+    };
+
+    childs[0] = _hl_get_or_create_cell_from_childs(NW);
+    childs[1] = _hl_get_or_create_cell_from_childs(NE);
+    childs[2] = _hl_get_or_create_cell_from_childs(SW);
+    childs[3] = _hl_get_or_create_cell_from_childs(SE);
   }
 
   return _hl_get_or_create_cell_from_childs(childs);
@@ -250,7 +276,7 @@ cell_id_t hl_double_empty(cell_id_t cell_id){
 
 
 //calcul du resultat au laps de temps 2^n-2
-cell_id_t hl_get_result(cell_id_t cell_id){
+cell_id_t hashlife::get_result(cell_id_t cell_id){
   cell_t cell = g_cells_arena [cell_id];
 
   // déjà calculé
@@ -258,9 +284,9 @@ cell_id_t hl_get_result(cell_id_t cell_id){
     return cell.result;
 
   if (cell.structure.n == 3){
-    bool grid[8][8];
-    bool temp[8][8];
-    _hl_cell_to_grid_aux(cell_id, (bool*)grid, 8, 0,0);
+    uint8_t grid[8][8];
+    uint8_t temp[8][8];
+    _hl_cell_to_grid_aux(cell_id, (uint8_t*)grid, 8, 0,0);
 
     for (int x = 1; x < 7; x++)
     for (int y = 1; y < 7; y++)
@@ -284,7 +310,7 @@ cell_id_t hl_get_result(cell_id_t cell_id){
       grid[x][y] = (count == 3) || (temp[x][y] && count == 2);
     }
     
-    return cell.result = _hl_cell_from_grid_aux((bool*)grid, 8, 2,2, 4);
+    return cell.result = _hl_cell_from_grid_aux((uint8_t*)grid, 8, 2,2, 4);
   }
 
   cell_t child[4];
@@ -316,7 +342,7 @@ cell_id_t hl_get_result(cell_id_t cell_id){
 
   cell_id_t large_center_results[3][3];
   for (int i = 0; i < 3; i++) for( int j = 0; j < 3; j++) 
-    large_center_results[i][j] = hl_get_result(large_center[i][j]);
+    large_center_results[i][j] = hashlife::get_result(large_center[i][j]);
 
   cell_id_t NW_childs[4] = {
     large_center_results[0][0], large_center_results[0][1],
@@ -333,35 +359,34 @@ cell_id_t hl_get_result(cell_id_t cell_id){
   };
 
   cell_id_t final_child[4] = {
-    hl_get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)NW_childs)), hl_get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)NE_childs)),
-    hl_get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)SW_childs)), hl_get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)SE_childs)),
+    hashlife::get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)NW_childs)), hashlife::get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)NE_childs)),
+    hashlife::get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)SW_childs)), hashlife::get_result(_hl_get_or_create_cell_from_childs((cell_id_t*)SE_childs)),
   };
   
   return cell.result = _hl_get_or_create_cell_from_childs((cell_id_t*)final_child);
 }
 
-void hl_print_cell(cell_id_t cell_id){
-  cell_t cell = g_cells_arena [cell_id];
-  int size = 0b1 << cell.structure.n;
-  bool *grid = malloc(size*size);
+void hashlife::print_cell(cell_id_t cell_id){
+    const cell_t& cell = g_cells_arena[cell_id];
+    int size = 1 << cell.structure.n;
 
-  hl_cell_to_grid(cell_id, grid);
+    std::vector<uint8_t> grid(size * size);
 
-  for (int i = 0; i < size; i++) {
-    for (int j = 0; j < size; j++) {
-      printf("%X ", grid[i*size + j]);
+    hashlife::cell_to_grid(cell_id, grid.data());
+
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            std::cout << grid[i * size + j] << " ";
+        }
+        std::cout << "\n";
     }
-    printf("\n");
-  }
-
-  free(grid);
 }
 
-size_t hl_memory_usage(){
-  return hmlenu(g_cells_map ) * sizeof(hash_node_t) +
-   arrlenu(g_cells_arena ) * sizeof(cell_t);
+std::size_t hashlife::memory_usage(){
+    return g_cells_map.size() * (sizeof(cell_struct_t) + sizeof(cell_id_t))
+         + g_cells_arena.size() * sizeof(cell_t);
 }
 
-int hl_get_order(cell_id_t id){
+int hashlife::get_order(cell_id_t id){
   return g_cells_arena[id].structure.n;
 }

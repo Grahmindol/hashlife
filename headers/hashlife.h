@@ -1,26 +1,27 @@
-#ifndef HASHLIFE_H
-#define HASHLIFE_H
+#pragma once
 
-#include <stdbool.h>
-#include <stddef.h>
+#include <cstddef>
+#include <cstdint>
 
-typedef unsigned int cell_id_t;
+namespace hashlife {
+
+using cell_id_t = uint32_t;
 
 // lifecycle
-void hl_reset();
+void reset();
 
 // construction
-cell_id_t hl_cell_from_grid(bool* grid, size_t size);
-void hl_cell_to_grid(cell_id_t id, bool* grid);
+cell_id_t cell_from_grid(const uint8_t* grid, std::size_t size);
+void cell_to_grid(cell_id_t id, uint8_t* grid);
 
 // ops
-cell_id_t hl_double_wrap(cell_id_t id);
-cell_id_t hl_double_empty(cell_id_t id);
-cell_id_t hl_get_result(cell_id_t id);
+cell_id_t double_wrap(cell_id_t id);
+cell_id_t double_empty(cell_id_t id);
+cell_id_t get_result(cell_id_t id);
 
 // utils
-void hl_print_cell(cell_id_t id);
-size_t hl_memory_usage();
-int hl_get_order(cell_id_t id);
+void print_cell(cell_id_t id);
+std::size_t memory_usage();
+int get_order(cell_id_t id);
 
-#endif
+} // namespace hashlife

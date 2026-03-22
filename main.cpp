@@ -8,8 +8,8 @@
 
 
 int g_size;
-bool* g_grid;
-cell_id_t g_id;
+uint8_t* g_grid;
+hashlife::cell_id_t g_id;
 
 double g_total_iters = 0;
 double g_last_time = 0;
@@ -22,7 +22,7 @@ double now() {
   return ts.tv_sec + ts.tv_nsec * 1e-9;
 }
 
-bool* load_rle(const char* filename, int* out_w, int* out_h) {
+uint8_t* load_rle(const char* filename, int* out_w, int* out_h) {
   FILE* f = fopen(filename, "r");
   if (!f) {
     perror("open RLE");
@@ -41,7 +41,7 @@ bool* load_rle(const char* filename, int* out_w, int* out_h) {
   *out_w = w;
   *out_h = h;
 
-  bool* grid = calloc(w * h, sizeof(bool));
+  uint8_t* grid = new uint8_t[w*h];
 
   int x = 0, y = 0;
   int count = 0;
@@ -80,7 +80,7 @@ bool* load_rle(const char* filename, int* out_w, int* out_h) {
 
 #include <unistd.h>
 
-void print_grid(bool* grid, int size) {
+void print_grid(uint8_t* grid, int size) {
   printf("\033[H"); // curseur en haut
   for (int i = 0; i < size; i++) {
     for (int j = 0; j < size; j++) {
@@ -124,12 +124,12 @@ void update(int v) {
 
   
 
-  g_id = hl_double_empty(g_id);
+  g_id = hashlife::double_empty(g_id);
 
-  double iters = 1 << (hl_get_order(g_id) - 2);
+  double iters = 1 << (hashlife::get_order(g_id) - 2);
   g_last_time = now();
 
-  g_id = hl_get_result(g_id);
+  g_id = hashlife::get_result(g_id);
 
   double t1 = now();
   double dt = t1 - g_last_time;
@@ -140,10 +140,10 @@ void update(int v) {
     g_last_time = t1;
 
   memset(g_grid, 0, g_size*g_size);
-  hl_cell_to_grid(g_id, g_grid);
+  hashlife::cell_to_grid(g_id, g_grid);
 
   // mémoire
-  double mem_kb = hl_memory_usage() / 1024.0;
+  double mem_kb = hashlife::memory_usage() / 1024.0;
 
   char title[256];
   snprintf(title, sizeof(title),
@@ -183,16 +183,16 @@ void print_bytes(void* ptr, size_t size) {
   printf("\n");
 }
 int main(int argc, char** argv) {
-  hl_reset();
+  hashlife::reset();
 
   int w, h;
-  bool* rle = load_rle("pattern.rle", &w, &h);
+  uint8_t* rle = load_rle("pattern.rle", &w, &h);
 
   int size = 8;
   while (size < w || size < h) size <<= 1;
 
   g_size = size;
-  g_grid = calloc(size * size, sizeof(bool));
+  g_grid = new uint8_t[size*size];
 
   int offx = (size - w)/2;
   int offy = (size - h)/2;
@@ -201,9 +201,9 @@ int main(int argc, char** argv) {
     for (int x = 0; x < w; x++)
       g_grid[(y+offy)*size + (x+offx)] = rle[y*w + x];
 
-  free(rle);
+  delete[](rle);
 
-  g_id = hl_cell_from_grid(g_grid, size);
+  g_id = hashlife::cell_from_grid(g_grid, size);
 
   glutInit(&argc, argv);
   init_gl(size);
