@@ -1,19 +1,18 @@
 
+#include <iostream>
+
 #include <GL/glut.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
-#include "hashlife.h"
+#include "hash_life.h"
 
 int g_size;
-uint8_t* g_grid;
-hashlife::cell_id_t g_id;
+std::vector<uint8_t> g_grid;
+HashLife g_root_cell;
 
-double g_total_iters = 0;
-double g_last_time = 0;
-double g_ips = 0;
 
 double now() {
   struct timespec ts;
@@ -73,18 +72,6 @@ uint8_t* load_rle(const char* filename, int* out_w, int* out_h) {
   return grid;
 }
 
-#include <unistd.h>
-
-void print_grid(uint8_t* grid, int size) {
-  printf("\033[H");  // curseur en haut
-  for (int i = 0; i < size; i++) {
-    for (int j = 0; j < size; j++) {
-      printf(grid[i * size + j] ? "██" : "  ");
-    }
-    printf("\n");
-  }
-}
-
 void display() {
   glClear(GL_COLOR_BUFFER_BIT);
 
@@ -113,33 +100,24 @@ void display() {
   glFlush();
 }
 
-void update(int v) {
+void update(int) {
+  //return;
   double t0 = now();
-
-  g_id = hashlife::double_empty(g_id);
-
-  double iters = 1 << (hashlife::get_order(g_id) - 2);
-  g_last_time = now();
-
-  g_id = hashlife::get_result(g_id);
-
+  g_root_cell.evolve();
   double t1 = now();
-  double dt = t1 - g_last_time;
-  g_total_iters += iters;
 
-  g_ips = g_total_iters / dt;
-  g_total_iters = 0;
-  g_last_time = t1;
+  double dt = t1 - t0;
+  double IPS = g_root_cell.time_jumps_size() / dt;
 
-  memset(g_grid, 0, g_size * g_size);
-  hashlife::cell_to_grid(g_id, g_grid);
+  
+  g_grid = static_cast<std::vector<uint8_t>>(g_root_cell);
 
   // mémoire
-  double mem_kb = hashlife::memory_usage() / 1024.0;
+  double mem_kc = g_root_cell.cells_count() / 1024.;
 
   char title[256];
-  snprintf(title, sizeof(title), "HashLife 🔥 | %.2f IPS | %.1f Ko", g_ips,
-           mem_kb);
+  snprintf(title, sizeof(title), "HashLife !! | %.2f IPS | %.1f KCell", IPS,
+           mem_kc);
 
   glutSetWindowTitle(title);
 
@@ -153,7 +131,7 @@ void init_gl(int size) {
 
   glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
   glutInitWindowSize(win, win);
-  glutCreateWindow("HashLife 🔥");
+  glutCreateWindow("HashLife !!");
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
@@ -165,16 +143,8 @@ void init_gl(int size) {
   glutTimerFunc(50, update, 0);
 }
 
-void print_bytes(void* ptr, size_t size) {
-  unsigned char* p = (unsigned char*)ptr;
-  for (size_t i = 0; i < size; i++) {
-    printf("%02X ", p[i]);
-  }
-  printf("\n");
-}
 int main(int argc, char** argv) {
-  hashlife::reset();
-
+  
   int w, h;
   uint8_t* rle = load_rle("pattern.rle", &w, &h);
 
@@ -182,7 +152,7 @@ int main(int argc, char** argv) {
   while (size < w || size < h) size <<= 1;
 
   g_size = size;
-  g_grid = new uint8_t[size * size];
+  g_grid = std::vector<uint8_t>(size * size);
 
   int offx = (size - w) / 2;
   int offy = (size - h) / 2;
@@ -193,7 +163,7 @@ int main(int argc, char** argv) {
 
   delete[] (rle);
 
-  g_id = hashlife::cell_from_grid(g_grid, size);
+  g_root_cell = HashLife(g_grid);
 
   glutInit(&argc, argv);
   init_gl(size);
